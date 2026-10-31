@@ -138,7 +138,7 @@ async def guess_chat(data:GuessChat,authorization:str|None=Header(None)):
         reply=(result.choices[0].message.content or '').strip()
     except Exception as exc:
         logging.exception('AI chat failed');raise HTTPException(502,'賢者暫時無法回應') from exc
-    if s['answer'] in reply:reply='我差點說溜嘴了！試試換個角度提問吧。'
+    if s['answer'] in reply:reply='我差點說溜嘴了！'
     context=[*context,{'role':'user','content':data.message},{'role':'assistant','content':reply}][-20:]
     await db('PATCH','guessing_sessions',f'?id=eq.{s["id"]}',{'question_count':s['question_count']+1,'conversation':context},{'Prefer':'return=minimal'})
     return {'reply':reply,'remaining':9-s['question_count']}
