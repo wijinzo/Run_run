@@ -31,6 +31,7 @@ function loadingState(visible, message = '森林正在傳遞星光，請稍候�
 function notify(message) {
   $('toast').textContent = message;
   $('toast').style.display = 'block';
+
   clearTimeout(window._toast);
   window._toast = setTimeout(() => {
     $('toast').style.display = 'none';
@@ -46,11 +47,13 @@ async function req(path, body, timeout = 60000) {
 
   if (!isChat) {
     let message = '正在與森林建立連線…';
+
     if (path.includes('/images/')) {
       message = '正在繪製你的冒險紀念卡，請不要離開…';
     } else if (path.includes('/guessing/')) {
       message = '貓頭鷹賢者正在思考…';
     }
+
     loadingState(true, message);
   }
 
@@ -105,6 +108,7 @@ function page(id) {
   if (id === 'map') refresh();
   if (id === 'quiz') renderQuiz();
   if (id === 'guessing') startGuess();
+
   if (id === 'pinball') {
     if (!active) {
       $('gameModal').style.display = 'flex';
@@ -113,6 +117,7 @@ function page(id) {
       $('startGame').textContent = '開始挑戰';
       resetEnemies();
     }
+
     drawGame();
   }
 }
@@ -124,7 +129,8 @@ async function refresh() {
 
     $('who').textContent = data.player_code;
     $('progress').textContent = `${data.completed.length} / 3 星光碎片`;
-    $('progressFill').style.width = (data.completed.length / 3 * 100) + '%';
+    $('progressFill').style.width =
+      (data.completed.length / 3 * 100) + '%';
 
     for (const [game, element] of [
       ['pinball', 'donePinball'],
@@ -221,10 +227,22 @@ const quiz = [
   {
     q: '哪一句話最讓你有感覺？',
     options: [
-      ['不戰鬥就無法生存', '看來你已經做好戰鬥的覺悟了。'],
-      ['沒有什麼必須堅持下去的理由，同樣也沒有放棄的理由。', '你適合打排球。'],
-      ['接下來會好轉，然後再變糟，又變好，這就是人生，我不會謊稱日日皆有陽光，不過陽光總會再次照耀，我向你保證，你將再次溫暖', '生先於死，力先於弱，旅程先於終點。'],
-      ['我無法成為主角，也拯救不了任何人，但至少我深深知曉這則故事，也能將這則故事傳遞出去。', '救贖的魔王讚賞你的選擇。']
+      [
+        '不戰鬥就無法生存',
+        '看來你已經做好戰鬥的覺悟了。'
+      ],
+      [
+        '沒有什麼必須堅持下去的理由，同樣也沒有放棄的理由。',
+        '你適合打排球。'
+      ],
+      [
+        '接下來會好轉，然後再變糟，又變好，這就是人生，我不會謊稱日日皆有陽光，不過陽光總會再次照耀，我向你保證，你將再次溫暖',
+        '生先於死，力先於弱，旅程先於終點。'
+      ],
+      [
+        '我無法成為主角，也拯救不了任何人，但至少我深深知曉這則故事，也能將這則故事傳遞出去。',
+        '救贖的魔王讚賞你的選擇。'
+      ]
     ]
   }
 ];
@@ -263,14 +281,17 @@ function renderQuiz() {
 
   $('confirmQuiz').hidden = quizConfirmed[quizAt];
   $('confirmQuiz').disabled = quizSelected === null;
+
   $('nextQuiz').hidden = !quizConfirmed[quizAt];
   $('nextQuiz').textContent =
     quizAt === 3 ? '完成試煉' : '下一題 →';
+
   $('prevQuiz').hidden = quizAt === 0;
 }
 
 $('confirmQuiz').onclick = () => {
   if (quizSelected === null) return;
+
   quizConfirmed[quizAt] = true;
   renderQuiz();
 };
@@ -292,10 +313,13 @@ $('nextQuiz').onclick = async () => {
         answers: quizAnswers
       });
 
-      $('quizStatus').textContent = '✓ 第三塊星光碎片已收集！';
+      $('quizStatus').textContent =
+        '✓ 第三塊星光碎片已收集！';
+
       quizAt = 0;
       quizSelected = null;
       quizConfirmed = [false, false, false, false];
+
       page('map');
       notify('古樹試煉完成！已取得星光碎片');
     } catch (error) {
@@ -314,8 +338,10 @@ function bubble(text, side = 'ai') {
   const element = document.createElement('div');
   element.className = 'bubble ' + side;
   element.textContent = text;
+
   $('messages').appendChild(element);
   $('messages').scrollTop = $('messages').scrollHeight;
+
   return element;
 }
 
@@ -332,6 +358,7 @@ function typingBubble() {
 
   $('messages').appendChild(element);
   $('messages').scrollTop = $('messages').scrollHeight;
+
   return element;
 }
 
@@ -340,16 +367,21 @@ async function startGuess(restart = false) {
 
   session = null;
   $('messages').replaceChildren();
-  bubble('我是貓頭鷹賢者。你可以向我提問，但我不會直接告訴你答案。');
-  $('chatStatus').textContent = '';
 
+  bubble(
+    '我是貓頭鷹賢者。你可以向我提問，但我不會直接告訴你答案。'
+  );
+
+  $('chatStatus').textContent = '';
   $('chatInput').disabled = false;
   $('chatSend').disabled = false;
 
   try {
     const data = await req('/api/guessing/start', { restart });
+
     session = data.session_id;
-    $('remaining').textContent = `剩餘 ${data.remaining} 次提問`;
+    $('remaining').textContent =
+      `剩餘 ${data.remaining} 次提問`;
 
     if (data.completed) {
       $('chatStatus').textContent = '✓ 已完成本關';
@@ -380,10 +412,13 @@ $('chatSend').onclick = async () => {
 
     loading.remove();
     bubble(data.reply);
-    $('remaining').textContent = `剩餘 ${data.remaining} 次提問`;
+
+    $('remaining').textContent =
+      `剩餘 ${data.remaining} 次提問`;
   } catch (error) {
     loading.remove();
     notify(error.message);
+
     bubble('抱歉，我剛才走神了。請再試一次。');
   } finally {
     chatLocked = false;
@@ -411,6 +446,7 @@ $('guessSend').onclick = async () => {
     });
 
     bubble('我猜：' + answer, 'user');
+
     bubble(
       data.correct
         ? '猜對了！你得到第二塊碎片。'
@@ -420,6 +456,7 @@ $('guessSend').onclick = async () => {
     if (data.correct) {
       $('chatStatus').textContent = '✓ 通關成功';
       session = null;
+
       setTimeout(() => {
         page('map');
         notify('謎語小屋通關成功！');
@@ -440,6 +477,7 @@ $('restartGuess').onclick = () => startGuess(true);
 $('generate').onclick = async () => {
   const button = $('generate');
   button.disabled = true;
+
   $('imageStatus').textContent =
     '星光正在凝聚，請不要重複點擊…';
 
@@ -452,6 +490,7 @@ $('generate').onclick = async () => {
 
     $('reward').src = data.url;
     $('reward').hidden = false;
+
     $('imageStatus').textContent =
       '✦ 你的冒險紀念卡完成了！';
   } catch (error) {
@@ -461,40 +500,88 @@ $('generate').onclick = async () => {
   }
 };
 
-// ===== 星隕彈珠台 =====
+// =====================================================
+// 第一關：星隕彈珠台
+// 本版完全取消自動追蹤，彈珠方向只受玩家發射與碰撞影響
+// =====================================================
 
 const canvas = $('game');
 const cx = canvas.getContext('2d');
+
 const WIDTH = 360;
 const HEIGHT = 540;
-const origin = { x: 180, y: 470 };
+
+const origin = {
+  x: 180,
+  y: 470
+};
 
 let active = false;
 let drag = false;
-let aim = { x: 0, y: 0 };
-let orb = { x: 180, y: 470, vx: 0, vy: 0, r: 13 };
+
+let aim = {
+  x: 0,
+  y: 0
+};
+
+let orb = {
+  x: origin.x,
+  y: origin.y,
+  vx: 0,
+  vy: 0,
+  r: 13
+};
+
 let enemies = [];
 let particles = [];
 let floating = [];
+
 let shots = 0;
 let damage = 0;
 let score = 0;
 let combo = 0;
+
 let attempt = '';
 let lastTime = 0;
 let anim = 0;
 let finish = false;
 let shotElapsed = 0;
 
+// 物理參數
+const LAUNCH_SPEED = 22;
+const FRICTION = 0.9988;
+const WALL_BOUNCE = 0.98;
+const ENEMY_BOUNCE = 1.12;
+const MAX_SHOT_TIME = 4300;
+
 function resetEnemies() {
   enemies = [
-    { x: 78, y: 124, r: 25, hp: 2, max: 2 },
-    { x: 278, y: 160, r: 25, hp: 2, max: 2 },
-    { x: 180, y: 270, r: 27, hp: 3, max: 3 }
+    {
+      x: 78,
+      y: 124,
+      r: 25,
+      hp: 2,
+      max: 2
+    },
+    {
+      x: 278,
+      y: 160,
+      r: 25,
+      hp: 2,
+      max: 2
+    },
+    {
+      x: 180,
+      y: 270,
+      r: 27,
+      hp: 3,
+      max: 3
+    }
   ];
 
   particles = [];
   floating = [];
+
   score = 0;
   shots = 0;
   combo = 0;
@@ -517,13 +604,17 @@ function resetEnemies() {
 function drawGame() {
   cx.clearRect(0, 0, WIDTH, HEIGHT);
 
-  const gradient = cx.createLinearGradient(0, 0, 0, HEIGHT);
+  const gradient = cx.createLinearGradient(
+    0, 0, 0, HEIGHT
+  );
+
   gradient.addColorStop(0, '#346857');
   gradient.addColorStop(1, '#163c35');
 
   cx.fillStyle = gradient;
   cx.fillRect(0, 0, WIDTH, HEIGHT);
 
+  // 背景星點
   for (let i = 0; i < 30; i++) {
     const x = i * 79 % WIDTH;
     const y = i * 131 % HEIGHT;
@@ -534,6 +625,7 @@ function drawGame() {
     cx.fill();
   }
 
+  // 遊戲邊界
   cx.strokeStyle = '#a1bb80';
   cx.lineWidth = 6;
   cx.strokeRect(8, 8, 344, 524);
@@ -541,25 +633,50 @@ function drawGame() {
   // 發射器
   cx.fillStyle = '#7dae84';
   cx.beginPath();
-  cx.arc(origin.x, origin.y, 28, 0, Math.PI * 2);
+  cx.arc(
+    origin.x,
+    origin.y,
+    28,
+    0,
+    Math.PI * 2
+  );
   cx.fill();
 
-  // 怪物
+  // 怪物與血條
   for (const enemy of enemies) {
     if (enemy.hp <= 0) continue;
 
     cx.fillStyle = '#f1b36e';
     cx.beginPath();
-    cx.arc(enemy.x, enemy.y, enemy.r, 0, Math.PI * 2);
+    cx.arc(
+      enemy.x,
+      enemy.y,
+      enemy.r,
+      0,
+      Math.PI * 2
+    );
     cx.fill();
 
+    // 眼睛
     cx.fillStyle = '#35453a';
     cx.beginPath();
-    cx.arc(enemy.x - 9, enemy.y - 4, 4, 0, Math.PI * 2);
-    cx.arc(enemy.x + 9, enemy.y - 4, 4, 0, Math.PI * 2);
+    cx.arc(
+      enemy.x - 9,
+      enemy.y - 4,
+      4,
+      0,
+      Math.PI * 2
+    );
+    cx.arc(
+      enemy.x + 9,
+      enemy.y - 4,
+      4,
+      0,
+      Math.PI * 2
+    );
     cx.fill();
 
-    // 血條
+    // 血條背景
     cx.fillStyle = '#243e32';
     cx.fillRect(
       enemy.x - enemy.r,
@@ -568,6 +685,7 @@ function drawGame() {
       7
     );
 
+    // 剩餘血量
     cx.fillStyle = '#9cde83';
     cx.fillRect(
       enemy.x - enemy.r,
@@ -577,11 +695,12 @@ function drawGame() {
     );
   }
 
-  // 瞄準線
+  // 瞄準線：完全由玩家的拖曳決定
   if (drag) {
     cx.setLineDash([7, 8]);
     cx.strokeStyle = '#ffe7a4';
     cx.lineWidth = 3;
+
     cx.beginPath();
     cx.moveTo(orb.x, orb.y);
     cx.lineTo(
@@ -596,14 +715,26 @@ function drawGame() {
   cx.fillStyle = '#f9d878';
   cx.shadowColor = '#ffdd82';
   cx.shadowBlur = 18;
+
   cx.beginPath();
-  cx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2);
+  cx.arc(
+    orb.x,
+    orb.y,
+    orb.r,
+    0,
+    Math.PI * 2
+  );
   cx.fill();
+
   cx.shadowBlur = 0;
 
   // 撞擊粒子
   for (const particle of particles) {
-    cx.globalAlpha = Math.max(0, particle.life / 22);
+    cx.globalAlpha = Math.max(
+      0,
+      particle.life / 22
+    );
+
     cx.fillStyle = particle.color;
     cx.beginPath();
     cx.arc(
@@ -617,22 +748,33 @@ function drawGame() {
   }
 
   cx.globalAlpha = 1;
-  cx.font = 'bold 17px sans-serif';
 
   // 傷害文字
+  cx.font = 'bold 17px sans-serif';
+
   for (const item of floating) {
     cx.fillStyle = '#ffe7ab';
-    cx.fillText(item.text, item.x, item.y);
+    cx.fillText(
+      item.text,
+      item.x,
+      item.y
+    );
   }
 
+  // Combo
   if (combo >= 2) {
     cx.fillStyle = '#ffeab1';
     cx.font = 'bold 21px sans-serif';
-    cx.fillText(`COMBO ×${combo}`, 117, 48);
+    cx.fillText(
+      `COMBO ×${combo}`,
+      117,
+      48
+    );
   }
 }
 
 function effects(x, y, text) {
+  // 撞擊粒子
   for (let i = 0; i < 16; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = Math.random() * 4 + 1;
@@ -644,10 +786,13 @@ function effects(x, y, text) {
       vy: Math.sin(angle) * speed,
       r: Math.random() * 3 + 2,
       life: 22,
-      color: i % 2 ? '#ffcd75' : '#eaf8bc'
+      color: i % 2
+        ? '#ffcd75'
+        : '#eaf8bc'
     });
   }
 
+  // 傷害數字
   floating.push({
     x,
     y: y - 15,
@@ -655,6 +800,7 @@ function effects(x, y, text) {
     life: 38
   });
 
+  // 手機震動
   if (navigator.vibrate) {
     navigator.vibrate(16);
   }
@@ -664,12 +810,19 @@ function launch() {
   if (!drag || !active || finish) return;
 
   drag = false;
-  const magnitude = Math.hypot(aim.x, aim.y);
+
+  const magnitude = Math.hypot(
+    aim.x,
+    aim.y
+  );
 
   if (magnitude < 10) return;
 
-  // 提高發射速度，最大 22
-  const power = Math.min(22, magnitude * .23);
+  // 只根據拖曳方向決定發射方向
+  const power = Math.min(
+    LAUNCH_SPEED,
+    magnitude * 0.23
+  );
 
   orb.vx = aim.x / magnitude * power;
   orb.vy = aim.y / magnitude * power;
@@ -677,86 +830,81 @@ function launch() {
   shots++;
   combo = 0;
   shotElapsed = 0;
+
   $('recallOrb').disabled = false;
 }
 
 function update(dt) {
   if (!active || finish) return;
 
-  const moving = Math.hypot(orb.vx, orb.vy) > .2;
+  const moving = Math.hypot(
+    orb.vx,
+    orb.vy
+  ) > 0.2;
 
-  // 每次發射最多約 4.3 秒，自動召回
+  // 發射超過指定時間就返回發射器
   if (moving) {
     shotElapsed += Math.min(dt, 33);
-    if (shotElapsed > 4300) {
+
+    if (shotElapsed > MAX_SHOT_TIME) {
       recallOrb();
+      return;
     }
   }
 
-  const step = Math.min(dt / 16.67, 2);
+  const step = Math.min(
+    dt / 16.67,
+    2
+  );
 
   for (let k = 0; k < Math.ceil(step); k++) {
-    if (Math.abs(orb.vx) + Math.abs(orb.vy) > .12) {
-      const targets = enemies.filter(enemy => enemy.hp > 0);
+    if (
+      Math.abs(orb.vx) +
+      Math.abs(orb.vy) > 0.12
+    ) {
 
-      // 輕微追蹤最近的怪物，減少空轉
-      if (targets.length && shotElapsed > 240) {
-        const target = targets.reduce((best, enemy) => {
-          const distance = Math.hypot(
-            enemy.x - orb.x,
-            enemy.y - orb.y
-          );
-          const bestDistance = Math.hypot(
-            best.x - orb.x,
-            best.y - orb.y
-          );
-          return distance < bestDistance ? enemy : best;
-        }, targets[0]);
-
-        const dx = target.x - orb.x;
-        const dy = target.y - orb.y;
-        const distance = Math.max(1, Math.hypot(dx, dy));
-
-        orb.vx = orb.vx * .965 + dx / distance * .7;
-        orb.vy = orb.vy * .965 + dy / distance * .7;
-
-        const speed = Math.hypot(orb.vx, orb.vy);
-
-        if (speed > 18) {
-          orb.vx *= 18 / speed;
-          orb.vy *= 18 / speed;
-        }
-      }
+      // =======================================
+      // 純物理移動：沒有任何自動追蹤
+      // =======================================
 
       orb.x += orb.vx;
       orb.y += orb.vy;
 
-      // 牆壁反彈
+      // 左右牆壁反彈
       if (
         orb.x < orb.r + 14 ||
         orb.x > WIDTH - orb.r - 14
       ) {
-        orb.vx *= -.98;
+        orb.vx *= -WALL_BOUNCE;
+
         orb.x = Math.max(
           orb.r + 14,
-          Math.min(WIDTH - orb.r - 14, orb.x)
+          Math.min(
+            WIDTH - orb.r - 14,
+            orb.x
+          )
         );
       }
 
+      // 上下牆壁反彈
       if (
         orb.y < orb.r + 14 ||
         orb.y > HEIGHT - orb.r - 14
       ) {
-        orb.vy *= -.98;
+        orb.vy *= -WALL_BOUNCE;
+
         orb.y = Math.max(
           orb.r + 14,
-          Math.min(HEIGHT - orb.r - 14, orb.y)
+          Math.min(
+            HEIGHT - orb.r - 14,
+            orb.y
+          )
         );
       }
 
-      // 降低速度衰減
-      orb.vx *= .9988;
-      orb.vy *= .9988;
+      // 速度緩慢衰減
+      orb.vx *= FRICTION;
+      orb.vy *= FRICTION;
 
       // 撞擊怪物
       for (const enemy of enemies) {
@@ -764,7 +912,11 @@ function update(dt) {
 
         const dx = orb.x - enemy.x;
         const dy = orb.y - enemy.y;
-        const distance = Math.hypot(dx, dy);
+
+        const distance = Math.hypot(
+          dx,
+          dy
+        );
 
         if (
           distance < orb.r + enemy.r &&
@@ -772,29 +924,56 @@ function update(dt) {
         ) {
           const nx = dx / distance;
           const ny = dy / distance;
-          const dot = orb.vx * nx + orb.vy * ny;
 
-          orb.x = enemy.x + nx * (orb.r + enemy.r + 1);
-          orb.y = enemy.y + ny * (orb.r + enemy.r + 1);
+          const dot =
+            orb.vx * nx +
+            orb.vy * ny;
+
+          // 避免彈珠卡在怪物內
+          orb.x = enemy.x +
+            nx * (orb.r + enemy.r + 1);
+
+          orb.y = enemy.y +
+            ny * (orb.r + enemy.r + 1);
 
           if (dot < 0) {
-            // 撞擊後稍微加速
-            orb.vx = (orb.vx - 2 * dot * nx) * 1.12;
-            orb.vy = (orb.vy - 2 * dot * ny) * 1.12;
+            // 根據碰撞法線反射
+            orb.vx = (
+              orb.vx - 2 * dot * nx
+            ) * ENEMY_BOUNCE;
+
+            orb.vy = (
+              orb.vy - 2 * dot * ny
+            ) * ENEMY_BOUNCE;
 
             enemy.hp--;
             combo++;
             damage++;
 
-            score += combo > 1 ? 85 : 60;
-            $('score').textContent = Math.min(score, 999);
+            score += combo > 1
+              ? 85
+              : 60;
 
-            effects(enemy.x, enemy.y, '-1 HP');
+            $('score').textContent =
+              Math.min(score, 999);
+
+            effects(
+              enemy.x,
+              enemy.y,
+              '-1 HP'
+            );
 
             $('enemyCount').textContent =
-              enemies.filter(e => e.hp > 0).length;
+              enemies.filter(
+                enemy => enemy.hp > 0
+              ).length;
 
-            if (enemies.every(e => e.hp <= 0)) {
+            // 擊敗所有怪物才算過關
+            if (
+              enemies.every(
+                enemy => enemy.hp <= 0
+              )
+            ) {
               winGame();
               return;
             }
@@ -802,30 +981,38 @@ function update(dt) {
         }
       }
 
-      // 停止後回到發射器
-      if (Math.hypot(orb.vx, orb.vy) < .16) {
-        orb.vx = 0;
-        orb.vy = 0;
-        orb.x = origin.x;
-        orb.y = origin.y;
-        $('recallOrb').disabled = true;
+      // 速度過低時自動返回發射器
+      if (
+        Math.hypot(
+          orb.vx,
+          orb.vy
+        ) < 0.16
+      ) {
+        recallOrb();
       }
     }
   }
 
-  particles = particles.filter(p => p.life-- > 0);
+  // 更新撞擊粒子
+  particles = particles.filter(
+    particle => particle.life-- > 0
+  );
 
   for (const particle of particles) {
     particle.x += particle.vx;
     particle.y += particle.vy;
-    particle.vx *= .95;
-    particle.vy *= .95;
+
+    particle.vx *= 0.95;
+    particle.vy *= 0.95;
   }
 
-  floating = floating.filter(item => item.life-- > 0);
+  // 更新傷害文字
+  floating = floating.filter(
+    item => item.life-- > 0
+  );
 
   for (const item of floating) {
-    item.y -= .7;
+    item.y -= 0.7;
   }
 }
 
@@ -836,6 +1023,7 @@ function recallOrb() {
   orb.y = origin.y;
   orb.vx = 0;
   orb.vy = 0;
+
   shotElapsed = 0;
   drag = false;
 
@@ -849,6 +1037,7 @@ function loop(time) {
 
   update(time - lastTime || 16);
   lastTime = time;
+
   drawGame();
 
   if (active) {
@@ -858,10 +1047,12 @@ function loop(time) {
 
 function startGame() {
   cancelAnimationFrame(anim);
-  resetEnemies();
 
+  resetEnemies();
   active = true;
+
   $('gameModal').style.display = 'none';
+
   attempt = crypto.randomUUID();
   lastTime = 0;
 
@@ -877,20 +1068,31 @@ async function winGame() {
 
   finish = true;
   active = false;
+
   cancelAnimationFrame(anim);
   $('recallOrb').disabled = true;
 
-  // 過關後分數快速增加到 1000
-  const initial = Math.min(score, 999);
+  // 通關時分數遞增至 1000
+  const initial = Math.min(
+    score,
+    999
+  );
+
   const begin = performance.now();
 
   await new Promise(resolve => {
     function tick(time) {
-      const progress = Math.min((time - begin) / 550, 1);
-      const ease = 1 - (1 - progress) ** 3;
+      const progress = Math.min(
+        (time - begin) / 550,
+        1
+      );
+
+      const ease =
+        1 - (1 - progress) ** 3;
 
       $('score').textContent = Math.round(
-        initial + (1000 - initial) * ease
+        initial +
+        (1000 - initial) * ease
       );
 
       if (progress < 1) {
@@ -904,6 +1106,7 @@ async function winGame() {
   });
 
   $('score').textContent = '1000';
+
   $('gameStatus').textContent =
     '怪物全部擊敗！正在儲存通關紀錄…';
 
@@ -936,6 +1139,7 @@ $('retryPinball').onclick = async () => {
     });
 
     button.hidden = true;
+
     page('map');
     notify('通關紀錄已成功儲存');
   } catch (error) {
@@ -951,16 +1155,29 @@ canvas.addEventListener('pointerdown', event => {
   if (
     !active ||
     finish ||
-    Math.hypot(orb.vx, orb.vy) > .2
+    Math.hypot(orb.vx, orb.vy) > 0.2
   ) return;
 
   const rect = canvas.getBoundingClientRect();
-  const x = (event.clientX - rect.left) * WIDTH / rect.width;
-  const y = (event.clientY - rect.top) * HEIGHT / rect.height;
 
-  if (Math.hypot(x - orb.x, y - orb.y) < 70) {
+  const x =
+    (event.clientX - rect.left) *
+    WIDTH / rect.width;
+
+  const y =
+    (event.clientY - rect.top) *
+    HEIGHT / rect.height;
+
+  if (
+    Math.hypot(
+      x - orb.x,
+      y - orb.y
+    ) < 70
+  ) {
     drag = true;
-    canvas.setPointerCapture(event.pointerId);
+    canvas.setPointerCapture(
+      event.pointerId
+    );
   }
 });
 
@@ -968,16 +1185,29 @@ canvas.addEventListener('pointermove', event => {
   if (!drag) return;
 
   const rect = canvas.getBoundingClientRect();
-  const x = (event.clientX - rect.left) * WIDTH / rect.width;
-  const y = (event.clientY - rect.top) * HEIGHT / rect.height;
+
+  const x =
+    (event.clientX - rect.left) *
+    WIDTH / rect.width;
+
+  const y =
+    (event.clientY - rect.top) *
+    HEIGHT / rect.height;
 
   aim = {
-    x: Math.max(-105, Math.min(105, orb.x - x)),
-    y: Math.max(-105, Math.min(105, orb.y - y))
+    x: Math.max(
+      -105,
+      Math.min(105, orb.x - x)
+    ),
+    y: Math.max(
+      -105,
+      Math.min(105, orb.y - y)
+    )
   };
 });
 
 canvas.addEventListener('pointerup', launch);
+
 canvas.addEventListener('pointercancel', () => {
   drag = false;
 });
