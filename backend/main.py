@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import httpx
 from openai import AsyncOpenAI
+import hmac
 
 SUPABASE_URL=os.getenv('SUPABASE_URL','').rstrip('/')
 SUPABASE_KEY=os.getenv('SUPABASE_SECRET_KEY','')
@@ -20,8 +21,9 @@ MAX_IMAGES=int(os.getenv('MAX_IMAGES','10'))
 app=FastAPI(title='Starlight Forest API',version='1.0')
 app.add_middleware(CORSMiddleware,allow_origins=[x.strip().rstrip('/') for x in FRONTEND_ORIGIN.split(',') if x.strip()],allow_methods=['GET','POST'],allow_headers=['Authorization','Content-Type'])
 
-class Login(BaseModel):player_code:str=Field(min_length=1,max_length=24)
-class QuizSubmit(BaseModel):answers:list[int]=Field(min_length=4,max_length=4)
+class Login(BaseModel):
+    player_code: str = Field(min_length=1, max_length=24)
+    invite_code: str = Field(min_length=1, max_length=100)class QuizSubmit(BaseModel):answers:list[int]=Field(min_length=4,max_length=4)
 class PinballSubmit(BaseModel):score:int=Field(ge=0,le=100000);attempt_id:str=Field(min_length=6,max_length=100)
 class StartGuess(BaseModel):restart:bool=False
 class Chat(BaseModel):session_id:str;message:str=Field(min_length=1,max_length=200)
@@ -62,15 +64,58 @@ async def mark(pid,game,score,completed,attempt,details=None):
 async def health():return {'status':'ok','service':'starlight-forest'}
 
 @app.post('/api/players/login')
-async def login(payload:Login):
-    code=payload.player_code.strip()
-    if not re.fullmatch(r'[\w\-]{1,24}',code,re.UNICODE):raise HTTPException(400,'編號只能使用文字、數字、底線或連字號')
-    rows=await db('GET','players',f'?player_code=eq.{code}&select=id,player_code')
-    if not rows:
-        await db('POST','players','',{'player_code':code},{'Prefer':'return=minimal,resolution=ignore-duplicates'})
-        rows=await db('GET','players',f'?player_code=eq.{code}&select=id,player_code')
-    return {'token':signer().dumps(rows[0]['id']),'player_code':code}
+async def login(payload: Login):
 
+    expected_code = os.getenv("INVITE_CODE")
+
+    if not expected_code:
+        raise HTTPException(
+            status_code=503,
+            detail="伺服器尚未設定邀請碼"
+        )
+
+    if not hmac.compare_digest(
+        payload.invite_code.encode("utf-8"),
+        expected_code.encode("utf-8")
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail="邀請碼錯誤"
+        )
+
+    code = payload.player_code.strip()
+
+    if not re.fullmatch(r'[\w\-]{1,24}', code, re.UNICODE):
+        raise HTTPException(
+            status_code=400,
+            detail="編號只能使用文字、數字、底線或連字號"
+        )
+
+    rows = await db(
+        'GET',
+        'players',
+        f'?player_code=eq.{code}&select=id,player_code'
+    )
+
+    if not rows:
+        await db(
+            'POST',
+            'players',
+            '',
+            {'player_code': code},
+            {'Prefer': 'return=minimal,resolution=ignore-duplicates'}
+        )
+
+        rows = await db(
+            'GET',
+            'players',
+            f'?player_code=eq.{code}&select=id,player_code'
+        )
+
+    return {
+        'token': signer().dumps(rows[0]['id']),
+        'player_code': code
+    }
 @app.get('/api/players/me')
 async def me(authorization:str|None=Header(default=None)):return await current_player(authorization)
 
