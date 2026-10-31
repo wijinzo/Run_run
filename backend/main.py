@@ -11,7 +11,7 @@ from openai import AsyncOpenAI
 logging.basicConfig(level=logging.INFO)
 SUPABASE_URL=os.getenv('SUPABASE_URL','').rstrip('/'); SUPABASE_KEY=os.getenv('SUPABASE_SECRET_KEY','')
 OPENAI_KEY=os.getenv('OPENAI_API_KEY',''); INVITE_CODE=os.getenv('INVITE_CODE',''); SESSION_SECRET=os.getenv('SESSION_SECRET','')
-TEXT_MODEL=os.getenv('OPENAI_TEXT_MODEL','gpt-4.1-mini'); IMAGE_MODEL=os.getenv('OPENAI_IMAGE_MODEL','gpt-image-1.5'); MAX_IMAGES=int(os.getenv('MAX_IMAGES','5'))
+TEXT_MODEL=os.getenv('OPENAI_TEXT_MODEL','gpt-4.1-mini'); IMAGE_MODEL=os.getenv('OPENAI_IMAGE_MODEL','gpt-image-2.5-flare'); MAX_IMAGES=int(os.getenv('MAX_IMAGES','5'))
 app=FastAPI(title='Starlight Forest',version='2.0')
 app.add_middleware(CORSMiddleware,allow_origins=[v.strip().rstrip('/') for v in os.getenv('FRONTEND_ORIGIN','http://localhost:5500').split(',')],allow_methods=['GET','POST'],allow_headers=['Authorization','Content-Type'])
 
@@ -172,7 +172,7 @@ async def generate_image(authorization:str|None=Header(None)):
         record=existing[0]
         if record['status']=='completed' and record.get('storage_path'):
             return {'url':f'{SUPABASE_URL}/storage/v1/object/public/rewards/{record["storage_path"]}','cached':True}
-        raise HTTPException(409,'已有生圖任務，請勿重複發送；如先前失敗，請先確認 API 消費紀錄')
+        raise HTTPException(409,'已有生圖任務，請勿重複發送；如先前失敗，請找管理員確認')
     all_images=await db('GET','generated_images','?select=id')
     if len(all_images)>=MAX_IMAGES:raise HTTPException(429,'已達全站測試生圖上限')
     quiz_entries=[r for r in items if r['game_type']=='quiz' and r['completed']]
@@ -196,4 +196,4 @@ async def generate_image(authorization:str|None=Header(None)):
     except Exception as exc:
         logging.exception('Image request failed')
         await db('PATCH','generated_images',f'?player_id=eq.{pid}',{'status':'failed'},{'Prefer':'return=minimal'})
-        raise HTTPException(502,'生圖失敗；請確認後端日誌與 OpenAI 帳單後再處理重試') from exc
+        raise HTTPException(502,'生圖失敗；請向管理員再處理重試') from exc
