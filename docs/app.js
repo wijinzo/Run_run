@@ -4,7 +4,13 @@ function toast(m){$('toast').textContent=m;$('toast').style.display='block';clea
 async function request(path,{method='GET',body,timeout=45000}={}){if(API.includes('YOUR-SERVICE'))throw Error('請先在 config.js 設定 Render 網址');let ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),timeout);try{const r=await fetch(API+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined,signal:ctrl.signal});let d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.detail||`伺服器錯誤 ${r.status}`);return d}catch(e){if(e.name==='AbortError')throw Error('連線逾時，請稍後重試');throw e}finally{clearTimeout(timer)}}
 function navigate(name){qs('.screen').forEach(e=>e.classList.toggle('active',e.id===name));scrollTo({top:0,behavior:'instant'});if(name==='quiz')renderQuiz();if(name==='guessing')startGuessIfNeeded();if(name==='pinball')renderPinball();if(name==='final')$('rewardImage').hidden=!state.image;if(name==='map')refreshProgress()}
 async function refreshProgress(){try{const d=await request('/api/progress');state=d;$('playerBadge').hidden=false;$('playerBadge').textContent='冒險者 '+d.player_code;const names={pinball:'donePinball',guessing:'doneGuessing',quiz:'doneQuiz'};for(const [key,id] of Object.entries(names))$(id).textContent=d.completed.includes(key)?'✓ 已完成':'開始 →';$('progressText').textContent=`${d.completed.length} / 3 星光碎片`;$('progressBar').style.width=(d.completed.length/3*100)+'%';$('finalBtn').disabled=d.completed.length<3;$('finalBtn').textContent=d.completed.length===3?'✦ 修復星之核心':'✦ 修復星之核心（完成 3 關解鎖）';if(d.image?.url){state.image=d.image.url;$('rewardImage').src=state.image;$('rewardImage').hidden=false}}catch(e){toast(e.message)}}
-$('loginBtn').onclick=async()=>{let code=$('playerCode').value.trim();if(!code){toast('請輸入玩家編號');return}try{const d=await request('/api/players/login',{method:'POST',body:{player_code:code}});token=d.token;localStorage.setItem('sf_token',token);await refreshProgress();navigate('map')}catch(e){toast(e.message)}};
+$('loginBtn').onclick=async()=>{let code=$('playerCode').value.trim();if(!code){toast('請輸入玩家編號');return}try{const d = await request('/api/players/login', {
+  method: 'POST',
+  body: {
+    player_code: code,
+    invite_code: $('inviteCode').value.trim()
+  }
+});;token=d.token;localStorage.setItem('sf_token',token);await refreshProgress();navigate('map')}catch(e){toast(e.message)}};
 $('logoutBtn').onclick=()=>{localStorage.removeItem('sf_token');token=null;guessSession=null;state={completed:[]};$('playerBadge').hidden=true;navigate('login')};qs('[data-go]').forEach(el=>el.onclick=()=>navigate(el.dataset.go));qs('.back').forEach(el=>el.onclick=()=>navigate('map'));$('finalBtn').onclick=()=>navigate('final');
 // Quiz: intentionally no correct/incorrect answers. Ancient tree is last chapter.
 const quiz=[
