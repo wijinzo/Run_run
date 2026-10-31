@@ -23,7 +23,8 @@ app.add_middleware(CORSMiddleware,allow_origins=[x.strip().rstrip('/') for x in 
 
 class Login(BaseModel):
     player_code: str = Field(min_length=1, max_length=24)
-    invite_code: str = Field(min_length=1, max_length=100)class QuizSubmit(BaseModel):answers:list[int]=Field(min_length=4,max_length=4)
+    invite_code: str = Field(min_length=1, max_length=100)
+class QuizSubmit(BaseModel):answers:list[int]=Field(min_length=4,max_length=4)
 class PinballSubmit(BaseModel):score:int=Field(ge=0,le=100000);attempt_id:str=Field(min_length=6,max_length=100)
 class StartGuess(BaseModel):restart:bool=False
 class Chat(BaseModel):session_id:str;message:str=Field(min_length=1,max_length=200)
