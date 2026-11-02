@@ -16,7 +16,7 @@ let quizConfirmed = [false, false, false, false];
 let session = null;
 let chatLocked = false;
 let pendingRequests = 0;
-let currentPage = 'login';
+let currentPage = 'story';
 
 // =====================================================
 // 共用工具
@@ -141,299 +141,74 @@ async function req(path, body, timeout = 60000) {
 // 不需修改 HTML、CSS
 // =====================================================
 
-const npcStyle = document.createElement('style');
-
-npcStyle.textContent = `
-  .npc-overlay {
-    position: fixed;
-    inset: 0;
-    z-index: 9990;
-    display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    background: rgba(9, 30, 26, .55);
-    backdrop-filter: blur(3px);
-    padding: 20px;
-  }
-
-  .npc-dialog {
-    width: 100%;
-    max-width: 440px;
-    background: #fff8df;
-    color: #30483b;
-    border: 3px solid #c4a66e;
-    border-radius: 22px;
-    padding: 24px 21px;
-    box-shadow: 0 12px 35px #102c2980;
-    cursor: pointer;
-    animation: npcAppear .25s ease-out;
-    position: relative;
-  }
-
-  .npc-dialog:focus-visible {
-    outline: 3px solid #2a785d;
-    outline-offset: 4px;
-  }
-
-  .npc-dialog-head {
-    display: flex;
-    align-items: center;
-    gap: 13px;
-    margin-bottom: 16px;
-  }
-
-  .npc-dialog-avatar {
-    width: 58px;
-    height: 58px;
-    border-radius: 50%;
-    background: #dceacb;
-    display: grid;
-    place-items: center;
-    font-size: 30px;
-    flex-shrink: 0;
-  }
-
-  .npc-dialog-name {
-    font-size: 16px;
-    font-weight: 900;
-    color: #28533d;
-  }
-
-  .npc-dialog-tag {
-    font-size: 11px;
-    color: #879783;
-    margin-top: 3px;
-  }
-
-  .npc-dialog-text {
-    font-size: 16px;
-    font-weight: 700;
-    line-height: 1.9;
-    margin: 0 0 18px;
-    color: #334a3d;
-  }
-
-  .npc-dialog-status {
-    font-size: 12px;
-    color: #6a7e6b;
-    text-align: right;
-    min-height: 20px;
-  }
-
-  .npc-dialog-status.error {
-    color: #b24f38;
-  }
-
-  .npc-dialog-arrow {
-    color: #9e814e;
-    display: inline-block;
-    animation: npcBounce .7s infinite alternate;
-  }
-
-  @keyframes npcAppear {
-    from {
-      opacity: 0;
-      transform: translateY(25px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes npcBounce {
-    to {
-      transform: translateY(5px);
-    }
-  }
-`;
-
-document.head.appendChild(npcStyle);
-
+const NPCS = {
+  pinball: { name: '彈珠精靈', image: 'assets/npc-spirit.webp', message: '星屑把谷中的小怪物都喚醒了！你只有三顆星光彈珠，善用反彈與連擊，幫我把散落的星光重新凝聚吧。' },
+  guessing: { name: '貓頭鷹賢者', image: 'assets/npc-owl.webp', message: '哦？想帶走星光碎片？先猜出我心裡的秘密吧。你有十次提問的機會……至於我說的話，呵呵，你可得自己判斷。' },
+  quiz: { name: '古樹長老', image: 'assets/npc-tree.webp', message: '我在這裡等了幾千年。要取得碎片，就讓我看看你的靈魂吧……先說好，我對你的選擇可能有一點意見。' }
+};
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 let npcDialog = null;
 
-/*
-  saveTask 是一個函式：
-    () => Promise
-
-  對話立即出現。
-  背景同時執行 saveTask。
-  點擊對話框才返回地圖。
-
-  如果儲存未完成：
-    記住點擊動作，完成後返回。
-
-  如果失敗：
-    保留對話框，點擊可重試。
-*/
-
-function showNpcDialog({
-  name,
-  icon,
-  message,
-  saveTask = null
-}) {
-  if (npcDialog) {
-    npcDialog.overlay.remove();
-    npcDialog = null;
-  }
-
-  const overlay = document.createElement('div');
+function showNpcDialog({ name, message, saveTask = null, onContinue = () => page('map'), intro = false }) {
+  if (npcDialog) return;
+  const previousFocus = document.activeElement;
+  const overlay = document.createElement('dialog');
   overlay.className = 'npc-overlay';
-
-  const dialog = document.createElement('div');
-  dialog.className = 'npc-dialog';
-  dialog.setAttribute('role', 'button');
-  dialog.setAttribute('tabindex', '0');
-
-  dialog.innerHTML = `
-    <div class="npc-dialog-head">
-      <div class="npc-dialog-avatar"></div>
-      <div>
-        <div class="npc-dialog-name"></div>
-        <div class="npc-dialog-tag">
-          星光碎片已取得
-        </div>
-      </div>
-    </div>
-
-    <p class="npc-dialog-text"></p>
-
-    <div class="npc-dialog-status">
-      正在記錄星光碎片…
-    </div>
-  `;
-
-  dialog.querySelector(
-    '.npc-dialog-avatar'
-  ).textContent = icon;
-
-  dialog.querySelector(
-    '.npc-dialog-name'
-  ).textContent = name;
-
-  dialog.querySelector(
-    '.npc-dialog-text'
-  ).textContent = `「${message}」`;
-
-  overlay.appendChild(dialog);
-  document.body.appendChild(overlay);
-
-  const status = dialog.querySelector(
-    '.npc-dialog-status'
-  );
-
-  const record = {
-    overlay,
-    saved: !saveTask,
-    saving: false,
-    error: null,
-    wantsReturn: false
-  };
-
+  overlay.setAttribute('aria-labelledby', 'npcName');
+  overlay.setAttribute('aria-describedby', 'npcText');
+  overlay.innerHTML = '<div class="npc-dialog"><div class="npc-dialog-head"><img class="npc-dialog-avatar" alt="" width="1254" height="1254"><div><h2 id="npcName"></h2><p class="npc-dialog-tag"></p></div></div><p id="npcText" class="npc-dialog-text"></p><p class="npc-dialog-status" role="status"></p><button class="primary npc-advance">顯示完整對話</button></div>';
+  overlay.querySelector('h2').textContent = name;
+  overlay.querySelector('img').src = Object.values(NPCS).find(n => n.name === name)?.image || NPCS.pinball.image;
+  overlay.querySelector('.npc-dialog-tag').textContent = intro ? '森林守護者' : '星光碎片已取得';
+  const text = overlay.querySelector('.npc-dialog-text');
+  const status = overlay.querySelector('.npc-dialog-status');
+  const button = overlay.querySelector('button');
+  const chars = Array.from('「' + message + '」');
+  const record = { overlay, saved: !saveTask, saving: false, error: null, wantsReturn: false };
   npcDialog = record;
-
-  function updateStatus() {
-    status.classList.remove('error');
-
-    if (record.saving) {
-      status.textContent =
-        record.wantsReturn
-          ? '星光碎片記錄中，完成後自動返回…'
-          : '點擊對話繼續 · 正在記錄…';
-
-    } else if (record.error) {
-      status.classList.add('error');
-      status.textContent =
-        '儲存失敗，點擊此處重試';
-
-    } else {
-      status.innerHTML =
-        '點擊對話，繼續冒險 ' +
-        '<span class="npc-dialog-arrow">▼</span>';
-    }
+  let at = 0, timer;
+  function update() {
+    status.classList.toggle('error', !!record.error);
+    status.textContent = record.error ? '儲存失敗：' + record.error.message : record.saving ? '正在記錄星光碎片…' : '';
+    button.textContent = at < chars.length ? '顯示完整對話' : record.error ? '重試儲存' : record.wantsReturn ? '記錄完成後繼續…' : intro ? '開始試煉 →' : '返回冒險地圖 →';
   }
-
-  function returnMap() {
-    if (npcDialog !== record) return;
-
-    overlay.remove();
-    npcDialog = null;
-
-    page('map');
+  function reveal() { clearInterval(timer); at = chars.length; text.textContent = chars.join(''); update(); }
+  function close(next) {
+    clearInterval(timer);
+    overlay.close(); overlay.remove(); npcDialog = null;
+    if (previousFocus?.isConnected) previousFocus.focus();
+    next();
   }
-
-  async function startSave() {
+  async function save() {
     if (!saveTask || record.saving) return;
-
-    record.saving = true;
-    record.error = null;
-
-    updateStatus();
-
+    record.saving = true; record.error = null; update();
     try {
-      await saveTask();
-
-      record.saved = true;
-      record.error = null;
-
-      updateStatus();
-
-      if (record.wantsReturn) {
-        returnMap();
-      }
-
-    } catch (error) {
-      record.error = error;
-      record.wantsReturn = false;
-
-      updateStatus();
-
-    } finally {
-      record.saving = false;
-      updateStatus();
-    }
+      await saveTask(); record.saved = true;
+    } catch (error) { record.error = error; record.wantsReturn = false; }
+    finally { record.saving = false; update(); }
+    if (record.saved && record.wantsReturn) close(onContinue);
   }
-
   function advance() {
-    if (record.saved) {
-      returnMap();
-      return;
-    }
-
-    if (record.error) {
-      startSave();
-      return;
-    }
-
-    record.wantsReturn = true;
-    updateStatus();
+    if (at < chars.length) { reveal(); return; }
+    if (record.saved) { close(onContinue); return; }
+    if (record.error) { save(); return; }
+    record.wantsReturn = true; update();
   }
-
-  dialog.addEventListener('click', advance);
-
-  dialog.addEventListener('keydown', event => {
-    if (
-      event.key === 'Enter' ||
-      event.key === ' '
-    ) {
-      event.preventDefault();
-      advance();
-    }
+  button.onclick = advance;
+  overlay.querySelector('.npc-dialog-text').onclick = advance;
+  overlay.addEventListener('cancel', event => {
+    event.preventDefault();
+    if (intro) close(() => {});
+    else advance();
   });
-
-  updateStatus();
-
-  if (saveTask) {
-    startSave();
-  }
-
+  document.body.appendChild(overlay);
+  overlay.showModal(); button.focus();
+  if (reducedMotion.matches) reveal();
+  else timer = setInterval(() => { text.textContent = chars.slice(0, ++at).join(''); if (at === chars.length) { clearInterval(timer); update(); } }, 28);
+  update(); if (saveTask) save();
   return record;
 }
 
-// =====================================================
-// 畫面切換
-// =====================================================
 
 function page(id) {
   if (currentPage === 'pinball' && id !== 'pinball') {
@@ -453,6 +228,8 @@ function page(id) {
   );
 
   window.scrollTo(0, 0);
+  $(id).querySelector('h1, h2')?.setAttribute('tabindex', '-1');
+  $(id).querySelector('h1, h2')?.focus({ preventScroll: true });
 
   if (id === 'map') {
     refresh();
@@ -504,6 +281,7 @@ async function refresh() {
     ];
 
     for (const [game, element] of games) {
+      document.querySelector('[data-go="' + game + '"]').classList.toggle('completed', data.completed.includes(game));
       $(element).textContent =
         data.completed.includes(game)
           ? '✓ 已完成'
@@ -571,13 +349,17 @@ $('loginBtn').onclick = async () => {
 $('logoutBtn').onclick = () => {
   token = null;
   localStorage.removeItem('sf_token');
+  state = { completed: [] }; session = null; chatLocked = false;
+  $('who').textContent = ''; $('reward').hidden = true; $('reward').removeAttribute('src');
+  $('userNote').value = ''; $('inviteCode').value = '';
   page('login');
 };
 
 document.querySelectorAll('[data-go]').forEach(
   button => {
     button.onclick = () => {
-      page(button.dataset.go);
+      const target = button.dataset.go;
+      showNpcDialog({ ...NPCS[target], intro: true, onContinue: () => page(target) });
     };
   }
 );
@@ -949,7 +731,7 @@ $('restartGuess').onclick = () => {
 
 // =====================================================
 // AI 生圖
-// 完全保留原本後端模型與 Prompt
+// 玩家註解與測驗結果共同決定紀念卡
 // =====================================================
 
 $('generate').onclick = async () => {
@@ -963,8 +745,8 @@ $('generate').onclick = async () => {
   try {
     const data = await req(
       '/api/images/generate',
-      {},
-      170000
+      { user_note: $('userNote').value.trim() },
+      190000
     );
 
     $('reward').src = data.url;
@@ -987,755 +769,244 @@ $('generate').onclick = async () => {
 // 無自動追蹤
 // =====================================================
 
+
 const canvas = $('game');
 const cx = canvas.getContext('2d');
+const WIDTH = 360, HEIGHT = 540;
+const origin = { x: 180, y: 470 };
+const MAX_SHOT_TIME = 5000;
+let active = false, drag = false, finish = false, shotActive = false;
+let aim = { x: 0, y: 0 }, orb, enemies = [], particles = [], floating = [];
+let score = 0, combo = 0, ballsLeft = 3, attempt = '', anim = 0, lastTime = 0, shotElapsed = 0;
+let hitPause = 0, shake = 0;
+const bumpers = [{x:35,y:75,r:13},{x:325,y:75,r:13},{x:35,y:265,r:13},{x:325,y:265,r:13}];
+const rand = (min,max) => min + Math.random() * (max-min);
 
-const WIDTH = 360;
-const HEIGHT = 540;
-
-const origin = {
-  x: 180,
-  y: 470
-};
-
-let active = false;
-let drag = false;
-
-let aim = {
-  x: 0,
-  y: 0
-};
-
-let orb = {
-  x: origin.x,
-  y: origin.y,
-  vx: 0,
-  vy: 0,
-  r: 13
-};
-
-let enemies = [];
-let particles = [];
-let floating = [];
-
-let shots = 0;
-let damage = 0;
-let score = 0;
-let combo = 0;
-
-let attempt = '';
-let lastTime = 0;
-let anim = 0;
-let finish = false;
-let shotElapsed = 0;
-
-// 遊戲物理設定
-const LAUNCH_SPEED = 22;
-const FRICTION = 0.9988;
-const WALL_BOUNCE = 0.98;
-const ENEMY_BOUNCE = 1.12;
-const MAX_SHOT_TIME = 4300;
-
+function spawnEnemy(enemy) {
+  // Avoid overlaps so the orb cannot get trapped inside stacked monsters.
+  for (let tries = 0; tries < 60; tries++) {
+    const x = rand(68,292), y = rand(100,330);
+    if (!enemies.some(e => e !== enemy && e.hp > 0 && Math.hypot(x-e.x,y-e.y) < enemy.r+e.r+15)) {
+      enemy.x=x; enemy.y=y; enemy.hp=enemy.max; enemy.flash=0; return;
+    }
+  }
+  enemy.respawn=performance.now()+200;
+}
+function resetOrb() {
+  orb = { ...origin, vx:0, vy:0, r:13, trail:[] };
+  shotActive=false; shotElapsed=0; drag=false; combo=0;
+  $('recallOrb').disabled=true;
+  $('launchOrb').disabled=!active || finish || ballsLeft <= 0;
+}
 function resetEnemies() {
+  active=false; finish=false; score=0; ballsLeft=3; combo=0; hitPause=0; shake=0;
   enemies = [
-    {
-      x: 78,
-      y: 124,
-      r: 25,
-      hp: 2,
-      max: 2
-    },
-    {
-      x: 278,
-      y: 160,
-      r: 25,
-      hp: 2,
-      max: 2
-    },
-    {
-      x: 180,
-      y: 270,
-      r: 27,
-      hp: 3,
-      max: 3
-    }
+    {x:78,y:120,r:23,hp:2,max:2,rare:false},
+    {x:280,y:155,r:23,hp:2,max:2,rare:false},
+    {x:180,y:275,r:25,hp:2,max:2,rare:false},
+    {x:290,y:295,r:18,hp:1,max:1,rare:true}
   ];
-
-  particles = [];
-  floating = [];
-
-  score = 0;
-  shots = 0;
-  combo = 0;
-  damage = 0;
-
-  finish = false;
-  shotElapsed = 0;
-
-  orb = {
-    x: origin.x,
-    y: origin.y,
-    vx: 0,
-    vy: 0,
-    r: 13
-  };
-
-  $('score').textContent = '0';
-  $('enemyCount').textContent = '3';
+  particles=[]; floating=[];
+  $('score').textContent='—'; $('ballsLeft').textContent='3';
+  $('gameStatus').textContent='盡情彈射！完成三次彈射，凝聚星光碎片。';
+  resetOrb();
 }
-
-function drawGame() {
-  cx.clearRect(0, 0, WIDTH, HEIGHT);
-
-  const gradient = cx.createLinearGradient(
-    0, 0, 0, HEIGHT
-  );
-
-  gradient.addColorStop(0, '#346857');
-  gradient.addColorStop(1, '#163c35');
-
-  cx.fillStyle = gradient;
-  cx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  // 背景星點
-  for (let i = 0; i < 30; i++) {
-    const x = i * 79 % WIDTH;
-    const y = i * 131 % HEIGHT;
-
-    cx.fillStyle = '#abcf9c88';
-
-    cx.beginPath();
-    cx.arc(x, y, 1.6, 0, Math.PI * 2);
-    cx.fill();
-  }
-
-  // 邊界
-  cx.strokeStyle = '#a1bb80';
-  cx.lineWidth = 6;
-  cx.strokeRect(8, 8, 344, 524);
-
-  // 發射器
-  cx.fillStyle = '#7dae84';
-
-  cx.beginPath();
-  cx.arc(
-    origin.x,
-    origin.y,
-    28,
-    0,
-    Math.PI * 2
-  );
-  cx.fill();
-
-  // 怪物
-  for (const enemy of enemies) {
-    if (enemy.hp <= 0) continue;
-
-    cx.fillStyle = '#f1b36e';
-
-    cx.beginPath();
-    cx.arc(
-      enemy.x,
-      enemy.y,
-      enemy.r,
-      0,
-      Math.PI * 2
-    );
-    cx.fill();
-
-    // 眼睛
-    cx.fillStyle = '#35453a';
-
-    cx.beginPath();
-    cx.arc(
-      enemy.x - 9,
-      enemy.y - 4,
-      4,
-      0,
-      Math.PI * 2
-    );
-    cx.arc(
-      enemy.x + 9,
-      enemy.y - 4,
-      4,
-      0,
-      Math.PI * 2
-    );
-    cx.fill();
-
-    // 血條底色
-    cx.fillStyle = '#243e32';
-
-    cx.fillRect(
-      enemy.x - enemy.r,
-      enemy.y - enemy.r - 13,
-      enemy.r * 2,
-      7
-    );
-
-    // 血量
-    cx.fillStyle = '#9cde83';
-
-    cx.fillRect(
-      enemy.x - enemy.r,
-      enemy.y - enemy.r - 13,
-      enemy.r * 2 * enemy.hp / enemy.max,
-      7
-    );
-  }
-
-  // 瞄準線
-  if (drag) {
-    cx.setLineDash([7, 8]);
-    cx.strokeStyle = '#ffe7a4';
-    cx.lineWidth = 3;
-
-    cx.beginPath();
-    cx.moveTo(orb.x, orb.y);
-
-    cx.lineTo(
-      orb.x + aim.x * 2.5,
-      orb.y + aim.y * 2.5
-    );
-
-    cx.stroke();
-    cx.setLineDash([]);
-  }
-
-  // 彈珠
-  cx.fillStyle = '#f9d878';
-  cx.shadowColor = '#ffdd82';
-  cx.shadowBlur = 18;
-
-  cx.beginPath();
-  cx.arc(
-    orb.x,
-    orb.y,
-    orb.r,
-    0,
-    Math.PI * 2
-  );
-  cx.fill();
-
-  cx.shadowBlur = 0;
-
-  // 粒子
-  for (const particle of particles) {
-    cx.globalAlpha = Math.max(
-      0,
-      particle.life / 22
-    );
-
-    cx.fillStyle = particle.color;
-
-    cx.beginPath();
-    cx.arc(
-      particle.x,
-      particle.y,
-      particle.r,
-      0,
-      Math.PI * 2
-    );
-    cx.fill();
-  }
-
-  cx.globalAlpha = 1;
-
-  // 傷害數字
-  cx.font = 'bold 17px sans-serif';
-
-  for (const item of floating) {
-    cx.fillStyle = '#ffe7ab';
-
-    cx.fillText(
-      item.text,
-      item.x,
-      item.y
-    );
-  }
-
-  // Combo
-  if (combo >= 2) {
-    cx.fillStyle = '#ffeab1';
-    cx.font = 'bold 21px sans-serif';
-
-    cx.fillText(
-      `COMBO ×${combo}`,
-      117,
-      48
-    );
+function burst(x,y,color) {
+  if (reducedMotion.matches) return;
+  for (let i=0;i<12;i++) {
+    const a=rand(0,Math.PI*2), speed=rand(40,170);
+    particles.push({x,y,vx:Math.cos(a)*speed,vy:Math.sin(a)*speed,life:.35,color});
   }
 }
-
-function effects(x, y, text) {
-  for (let i = 0; i < 16; i++) {
-    const angle =
-      Math.random() * Math.PI * 2;
-
-    const speed =
-      Math.random() * 4 + 1;
-
-    particles.push({
-      x,
-      y,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      r: Math.random() * 3 + 2,
-      life: 22,
-
-      color: i % 2
-        ? '#ffcd75'
-        : '#eaf8bc'
-    });
-  }
-
-  floating.push({
-    x,
-    y: y - 15,
-    text,
-    life: 38
-  });
-
-  if (navigator.vibrate) {
-    navigator.vibrate(16);
+function hitFeedback(text,x,y) {
+  floating.push({x,y,text,life:.8});
+}
+function finishShot() {
+  resetOrb();
+  if (ballsLeft <= 0 && !finish) {
+    winGame();
   }
 }
-
-function launch() {
-  if (!drag || !active || finish) return;
-
-  drag = false;
-
-  const magnitude = Math.hypot(
-    aim.x,
-    aim.y
-  );
-
-  if (magnitude < 10) return;
-
-  const power = Math.min(
-    LAUNCH_SPEED,
-    magnitude * 0.23
-  );
-
-  orb.vx = aim.x / magnitude * power;
-  orb.vy = aim.y / magnitude * power;
-
-  shots++;
-  combo = 0;
-  shotElapsed = 0;
-
-  $('recallOrb').disabled = false;
+function recallOrb() { if (active && shotActive && !finish) finishShot(); }
+$('recallOrb').onclick=recallOrb;
+function launchVector(dx,dy) {
+  if (!active || finish || shotActive || ballsLeft <= 0) return;
+  const length=Math.hypot(dx,dy); if (length < 8) return;
+  const speed=1400;
+  orb.vx=dx/length*speed; orb.vy=dy/length*speed;
+  drag=false; shotActive=true; combo=0; shotElapsed=0; ballsLeft--;
+  $('ballsLeft').textContent=String(ballsLeft);
+  $('recallOrb').disabled=false; $('launchOrb').disabled=true;
 }
-
-function update(dt) {
-  if (!active || finish) return;
-
-  const moving = Math.hypot(
-    orb.vx,
-    orb.vy
-  ) > 0.2;
-
-  if (moving) {
-    shotElapsed += Math.min(dt, 33);
-
-    if (shotElapsed > MAX_SHOT_TIME) {
-      recallOrb();
-      return;
-    }
-  }
-
-  const step = Math.min(
-    dt / 16.67,
-    2
-  );
-
-  for (
-    let k = 0;
-    k < Math.ceil(step);
-    k++
-  ) {
-    if (
-      Math.abs(orb.vx) +
-      Math.abs(orb.vy) > 0.12
-    ) {
-
-      // 純物理移動，不追蹤怪物
-      orb.x += orb.vx;
-      orb.y += orb.vy;
-
-      // 左右牆
-      if (
-        orb.x < orb.r + 14 ||
-        orb.x > WIDTH - orb.r - 14
-      ) {
-        orb.vx *= -WALL_BOUNCE;
-
-        orb.x = Math.max(
-          orb.r + 14,
-          Math.min(
-            WIDTH - orb.r - 14,
-            orb.x
-          )
-        );
-      }
-
-      // 上下牆
-      if (
-        orb.y < orb.r + 14 ||
-        orb.y > HEIGHT - orb.r - 14
-      ) {
-        orb.vy *= -WALL_BOUNCE;
-
-        orb.y = Math.max(
-          orb.r + 14,
-          Math.min(
-            HEIGHT - orb.r - 14,
-            orb.y
-          )
-        );
-      }
-
-      // 速度衰減
-      orb.vx *= FRICTION;
-      orb.vy *= FRICTION;
-
-      // 怪物碰撞
-      for (const enemy of enemies) {
-        if (enemy.hp <= 0) continue;
-
-        const dx = orb.x - enemy.x;
-        const dy = orb.y - enemy.y;
-
-        const distance = Math.hypot(
-          dx,
-          dy
-        );
-
-        if (
-          distance < orb.r + enemy.r &&
-          distance > 0
-        ) {
-          const nx = dx / distance;
-          const ny = dy / distance;
-
-          const dot =
-            orb.vx * nx +
-            orb.vy * ny;
-
-          // 防止陷入怪物
-          orb.x =
-            enemy.x +
-            nx * (orb.r + enemy.r + 1);
-
-          orb.y =
-            enemy.y +
-            ny * (orb.r + enemy.r + 1);
-
-          if (dot < 0) {
-            // 正常物理反射
-            orb.vx = (
-              orb.vx - 2 * dot * nx
-            ) * ENEMY_BOUNCE;
-
-            orb.vy = (
-              orb.vy - 2 * dot * ny
-            ) * ENEMY_BOUNCE;
-
-            enemy.hp--;
-            combo++;
-            damage++;
-
-            score += combo > 1
-              ? 85
-              : 60;
-
-            $('score').textContent =
-              Math.min(score, 999);
-
-            effects(
-              enemy.x,
-              enemy.y,
-              '-1 HP'
-            );
-
-            $('enemyCount').textContent =
-              enemies.filter(
-                enemy => enemy.hp > 0
-              ).length;
-
-            // 所有怪物死亡
-            if (
-              enemies.every(
-                enemy => enemy.hp <= 0
-              )
-            ) {
-              winGame();
-              return;
-            }
-          }
-        }
-      }
-
-      // 速度太低時召回
-      if (
-        Math.hypot(
-          orb.vx,
-          orb.vy
-        ) < 0.16
-      ) {
-        recallOrb();
-      }
-    }
-  }
-
-  // 更新粒子
-  particles = particles.filter(
-    particle => particle.life-- > 0
-  );
-
-  for (const particle of particles) {
-    particle.x += particle.vx;
-    particle.y += particle.vy;
-
-    particle.vx *= 0.95;
-    particle.vy *= 0.95;
-  }
-
-  // 更新傷害文字
-  floating = floating.filter(
-    item => item.life-- > 0
-  );
-
-  for (const item of floating) {
-    item.y -= 0.7;
-  }
+function launch() { if (drag) { launchVector(aim.x,aim.y); drag=false; } }
+function launchAngle() {
+  const angle=Number($('launchAngle').value)*Math.PI/180;
+  launchVector(Math.sin(angle)*100,-Math.cos(angle)*100);
 }
-
-function recallOrb() {
-  if (!active || finish) return;
-
-  orb.x = origin.x;
-  orb.y = origin.y;
-  orb.vx = 0;
-  orb.vy = 0;
-
-  shotElapsed = 0;
-  drag = false;
-
-  $('recallOrb').disabled = true;
-}
-
-$('recallOrb').onclick = recallOrb;
-
-function loop(time) {
-  if (!active) return;
-
-  update(time - lastTime || 16);
-  lastTime = time;
-
-  drawGame();
-
-  if (active) {
-    anim = requestAnimationFrame(loop);
-  }
-}
-
-function startGame() {
-  cancelAnimationFrame(anim);
-
-  resetEnemies();
-
-  active = true;
-
-  $('gameModal').style.display = 'none';
-
-  attempt = crypto.randomUUID();
-  lastTime = 0;
-
-  $('recallOrb').disabled = true;
-  $('retryPinball').hidden = true;
-  $('gameStatus').textContent = '';
-
-  anim = requestAnimationFrame(loop);
-}
-
-async function winGame() {
-  if (finish) return;
-
-  finish = true;
-  active = false;
-
-  cancelAnimationFrame(anim);
-
-  $('recallOrb').disabled = true;
-
-  // 分數快速增加到 1000
-  const initial = Math.min(
-    score,
-    999
-  );
-
-  const begin = performance.now();
-
-  await new Promise(resolve => {
-    function tick(time) {
-      const progress = Math.min(
-        (time - begin) / 450,
-        1
-      );
-
-      const ease =
-        1 - (1 - progress) ** 3;
-
-      $('score').textContent = Math.round(
-        initial +
-        (1000 - initial) * ease
-      );
-
-      if (progress < 1) {
-        requestAnimationFrame(tick);
-      } else {
-        resolve();
-      }
-    }
-
-    requestAnimationFrame(tick);
-  });
-
-  $('score').textContent = '1000';
-
-  // 保留本次過關 ID
-  const completedAttempt = attempt;
-
-  // 立即顯示 NPC 通關對話
-  // 同時在背景儲存成績
-  showNpcDialog({
-    name: '彈珠精靈',
-    icon: '✦',
-
-    message:
-      '漂亮的一擊！' +
-      '星隕之谷的怪物都被你打敗了！' +
-      '這塊星光碎片就交給你啦！',
-
-    saveTask: () => req(
-      '/api/pinball/submit',
-      {
-        score: 1000,
-        attempt_id: completedAttempt
-      }
-    )
-  });
-}
-
-$('retryPinball').onclick = async () => {
-  const button = $('retryPinball');
-
-  button.disabled = true;
-
-  try {
-    await req(
-      '/api/pinball/submit',
-      {
-        score: 1000,
-        attempt_id: attempt
-      }
-    );
-
-    button.hidden = true;
-
-    page('map');
-
-  } catch (error) {
-    notify(error.message);
-
-  } finally {
-    button.disabled = false;
-  }
+$('launchOrb').onclick=launchAngle;
+$('launchAngle').oninput=() => {
+  const angle=Number($('launchAngle').value);
+  $('angleLabel').textContent=angle===0?'正前方':(angle<0?'左':'右')+Math.abs(angle)+'°';
+  if (!shotActive) drawGame();
 };
-
-// =====================================================
-// 手機拖曳彈射
-// =====================================================
-
-canvas.addEventListener('pointerdown', event => {
-  if (
-    !active ||
-    finish ||
-    Math.hypot(orb.vx, orb.vy) > 0.2
-  ) {
-    return;
-  }
-
-  const rect =
-    canvas.getBoundingClientRect();
-
-  const x =
-    (event.clientX - rect.left) *
-    WIDTH / rect.width;
-
-  const y =
-    (event.clientY - rect.top) *
-    HEIGHT / rect.height;
-
-  if (
-    Math.hypot(
-      x - orb.x,
-      y - orb.y
-    ) < 70
-  ) {
-    drag = true;
-
-    aim = { x: 0, y: 0 };
-
-    canvas.setPointerCapture(
-      event.pointerId
-    );
+canvas.addEventListener('keydown', event => {
+  if (['ArrowLeft','ArrowRight',' '].includes(event.key)) {
+    event.preventDefault();
+    if (event.key===' ') launchAngle();
+    else { $('launchAngle').value=String(Math.max(-70,Math.min(70,Number($('launchAngle').value)+(event.key==='ArrowLeft'?-5:5)))); $('launchAngle').oninput(); }
   }
 });
-
-canvas.addEventListener('pointermove', event => {
-  if (!drag) return;
-
-  const rect =
-    canvas.getBoundingClientRect();
-
-  const x =
-    (event.clientX - rect.left) *
-    WIDTH / rect.width;
-
-  const y =
-    (event.clientY - rect.top) *
-    HEIGHT / rect.height;
-
-  aim = {
-    x: Math.max(
-      -105,
-      Math.min(105, orb.x - x)
-    ),
-
-    y: Math.max(
-      -105,
-      Math.min(105, orb.y - y)
-    )
-  };
+function collide(target, multiplier, monster) {
+  const dx=orb.x-target.x, dy=orb.y-target.y, distance=Math.hypot(dx,dy);
+  const radius=orb.r+target.r;
+  if (distance >= radius) return;
+  const nx=distance ? dx/distance : 0, ny=distance ? dy/distance : -1;
+  orb.x=target.x+nx*(radius+.1); orb.y=target.y+ny*(radius+.1);
+  const dot=orb.vx*nx+orb.vy*ny;
+  if (dot>=0) return;
+  orb.vx=(orb.vx-2*dot*nx)*multiplier; orb.vy=(orb.vy-2*dot*ny)*multiplier;
+  const speed=Math.hypot(orb.vx,orb.vy), capped=Math.min(1900,Math.max(1100,speed));
+  orb.vx*=capped/speed; orb.vy*=capped/speed;
+  burst(target.x,target.y,monster && target.rare?'#ffe599':'#bddecc');
+  if (!monster) return;
+  target.hp--; target.flash=.09; combo++;
+  hitPause=32; shake=reducedMotion.matches?0:4;
+  hitFeedback('命中',target.x,target.y-20);
+  if (target.hp<=0) {
+    target.respawn=performance.now()+(target.rare?1400:800);
+    hitFeedback(target.rare?'稀有擊倒！':'擊倒！',target.x,target.y-35);
+  }
+}
+function update(dt,now) {
+  for (const e of enemies) {
+    if (e.hp<=0 && now>=e.respawn) spawnEnemy(e);
+    e.flash=Math.max(0,(e.flash||0)-dt/1000);
+  }
+  particles=particles.filter(p=>(p.life-=dt/1000)>0);
+  for(const p of particles){p.x+=p.vx*dt/1000;p.y+=p.vy*dt/1000;}
+  floating=floating.filter(f=>(f.life-=dt/1000)>0);
+  for(const f of floating) f.y-=dt*.025;
+  shake=Math.max(0,shake-dt*.04);
+  if(!shotActive) return;
+  shotElapsed+=dt;
+  if(shotElapsed>=MAX_SHOT_TIME){finishShot();return;}
+  if(hitPause>0){hitPause=Math.max(0,hitPause-dt);return;}
+  // Small integration steps prevent tunneling through a monster at high speed.
+  const steps=Math.ceil(dt/3), step=dt/steps/1000;
+  for(let i=0;i<steps;i++){
+    orb.x+=orb.vx*step; orb.y+=orb.vy*step;
+    if(orb.x<27){orb.x=27;orb.vx=Math.abs(orb.vx);}
+    if(orb.x>WIDTH-27){orb.x=WIDTH-27;orb.vx=-Math.abs(orb.vx);}
+    if(orb.y<27){orb.y=27;orb.vy=Math.abs(orb.vy);}
+    if(orb.y>HEIGHT-27){orb.y=HEIGHT-27;orb.vy=-Math.abs(orb.vy);}
+    for(const b of bumpers) collide(b,1.04,false);
+    for(const e of enemies) if(e.hp>0) collide(e,1.06,true);
+  }
+  orb.trail.push({x:orb.x,y:orb.y}); if(orb.trail.length>14)orb.trail.shift();
+}
+function circle(x,y,r,color) { cx.fillStyle=color;cx.beginPath();cx.arc(x,y,r,0,Math.PI*2);cx.fill(); }
+function drawGame() {
+  cx.save();
+  if(shake)cx.translate(rand(-shake,shake),rand(-shake,shake));
+  const gradient=cx.createLinearGradient(0,0,0,HEIGHT);
+  gradient.addColorStop(0,'#344f4c');gradient.addColorStop(1,'#182f30');
+  cx.fillStyle=gradient;cx.fillRect(0,0,WIDTH,HEIGHT);
+  for(let i=0;i<30;i++)circle(i*79%WIDTH,i*131%HEIGHT,1.3,'#b4c9b588');
+  cx.strokeStyle='#acbd9e';cx.lineWidth=4;cx.strokeRect(12,12,336,516);
+  for(const b of bumpers){circle(b.x,b.y,b.r,'#94b6b2');circle(b.x,b.y,5,'#e7efdc');}
+  circle(origin.x,origin.y,27,'#66836c');
+  for(const e of enemies){
+    if(e.hp<=0)continue;
+    circle(e.x,e.y,e.r,e.flash>0?'#fffbe2':e.rare?'#e6c47d':'#b5c4a2');
+    circle(e.x-7,e.y-3,3,'#30493f');circle(e.x+7,e.y-3,3,'#30493f');
+    cx.fillStyle='#142d29';cx.fillRect(e.x-e.r,e.y-e.r-10,e.r*2,4);
+    cx.fillStyle='#ebdca7';cx.fillRect(e.x-e.r,e.y-e.r-10,e.r*2*e.hp/e.max,4);
+    if(e.rare){cx.fillStyle='#fff3c6';cx.font='12px sans-serif';cx.textAlign='center';cx.fillText('稀有',e.x,e.y+e.r+15);}
+  }
+  if(!reducedMotion.matches)orb.trail.forEach((p,i)=>{cx.globalAlpha=i/orb.trail.length*.35;circle(p.x,p.y,7,'#f1d999');});
+  cx.globalAlpha=1;
+  if(drag || (!shotActive && active)){
+    const angle=Number($('launchAngle').value)*Math.PI/180;
+    const dx=drag?aim.x:Math.sin(angle)*80, dy=drag?aim.y:-Math.cos(angle)*80;
+    cx.setLineDash([6,7]);cx.strokeStyle='#e6d9ad';cx.lineWidth=2;cx.beginPath();cx.moveTo(orb.x,orb.y);cx.lineTo(orb.x+dx*2,orb.y+dy*2);cx.stroke();cx.setLineDash([]);
+  }
+  circle(orb.x,orb.y,orb.r,'#f6d995');circle(orb.x-3,orb.y-4,4,'#fff4cd');
+  for(const p of particles){cx.globalAlpha=p.life/.35;circle(p.x,p.y,2,p.color);}
+  cx.globalAlpha=1;cx.textAlign='center';cx.font='bold 17px sans-serif';cx.fillStyle='#ffebae';
+  for(const f of floating)cx.fillText(f.text,f.x,f.y);
+  if(combo>=2){cx.font='bold 23px sans-serif';cx.fillText('COMBO ×'+combo,WIDTH/2,50);}
+  cx.restore();
+}
+function loop(time){
+  if(!active)return;
+  const dt=Math.min(32,lastTime?time-lastTime:16);lastTime=time;
+  update(dt,time);drawGame();
+  if(active)anim=requestAnimationFrame(loop);
+}
+function startGame(){
+  cancelAnimationFrame(anim);resetEnemies();active=true;lastTime=0;attempt=crypto.randomUUID();
+  $('gameModal').style.display='none';$('launchOrb').disabled=false;
+  anim=requestAnimationFrame(loop);
+}
+function winGame(){
+  if(finish || ballsLeft > 0 || shotActive)return;
+  finish=true;active=false;shotActive=false;cancelAnimationFrame(anim);
+  $('recallOrb').disabled=true;$('launchOrb').disabled=true;
+  score=1000+Math.floor(Math.random()*51)*10;
+  $('score').textContent=String(score);
+  $('gameStatus').textContent='三次彈射完成！獲得 '+score+' 分。';
+  const finalScore=score, completedAttempt=attempt;
+  showNpcDialog({
+    name:'彈珠精靈',
+    message:'三次彈射完成！散落的星屑終於凝聚成碎片了。這一塊，歸你了！你獲得了 '+finalScore+' 分作為冒險紀念。',
+    saveTask:()=>req('/api/pinball/submit',{score:finalScore,attempt_id:completedAttempt})
+  });
+}
+canvas.addEventListener('pointerdown',event=>{
+  if(!active||finish||shotActive||ballsLeft<=0)return;
+  const rect=canvas.getBoundingClientRect(),x=(event.clientX-rect.left)*WIDTH/rect.width,y=(event.clientY-rect.top)*HEIGHT/rect.height;
+  if(Math.hypot(x-orb.x,y-orb.y)<70){drag=true;aim={x:0,y:0};canvas.setPointerCapture(event.pointerId);}
 });
-
-canvas.addEventListener('pointerup', launch);
-
-canvas.addEventListener('pointercancel', () => {
-  drag = false;
+canvas.addEventListener('pointermove',event=>{
+  if(!drag)return;
+  const rect=canvas.getBoundingClientRect();
+  aim={x:Math.max(-110,Math.min(110,orb.x-(event.clientX-rect.left)*WIDTH/rect.width)),y:Math.max(-110,Math.min(110,orb.y-(event.clientY-rect.top)*HEIGHT/rect.height))};
 });
+canvas.addEventListener('pointerup',launch);
+canvas.addEventListener('pointercancel',()=>{drag=false;});
+canvas.addEventListener('lostpointercapture',()=>{drag=false;});
+$('startGame').onclick=startGame;
+resetEnemies();drawGame();
 
-$('startGame').onclick = startGame;
 
-resetEnemies();
-drawGame();
-
-// =====================================================
-// 自動恢復登入
-// =====================================================
+const storyFrames = [
+  ['曾經的星光森林', '很久以前，星光森林的夜空中，懸掛著一顆永不熄滅的星星。人們稱它為「星之核心」，它的光芒守護著森林裡的一切。', '星之核心照亮寧靜的森林與溪流'],
+  ['星之核心碎裂', '然而某個夜晚，一聲巨響劃破天際。星之核心突然碎裂，化作三道流星，墜落在森林深處。失去星光的森林，漸漸暗了下來。', '三塊星光碎片劃過夜空'],
+  ['三道試煉', '碎片散落在星隕之谷、謎語小屋，以及古樹的根系深處。想找回星光，就得通過森林守護者們的考驗。', '星隕之谷、謎語小屋與智慧古樹'],
+  ['冒險開始', '如今，森林正等待一位新的冒險者。找回三塊星光碎片，讓夜空重新閃耀。那麼，你準備好了嗎？', '精靈在發光的森林小徑等待冒險者']
+];
+let storyAt = 0;
+function renderStory() {
+  const [title, text, alt] = storyFrames[storyAt];
+  $('storyTitle').textContent = title; $('storyText').textContent = text;
+  $('storyArt').src = 'assets/story-0' + (storyAt + 1) + '.webp';
+  $('storyArt').alt = alt;
+  $('storyCount').textContent = '序章 · 0' + (storyAt + 1) + ' / 04';
+  $('prevStory').disabled = storyAt === 0;
+  $('nextStory').textContent = storyAt === 3 ? '準備出發 →' : '繼續故事 →';
+  // Only preload the next frame, keeping the initial download small.
+  if (storyAt < 3) { const image = new Image(); image.src = 'assets/story-0' + (storyAt + 2) + '.webp'; }
+}
+function nextStory() {
+  if (storyAt === 3) { page('login'); return; }
+  storyAt++; renderStory();
+}
+$('nextStory').onclick = nextStory;
+$('storyArtButton').onclick = nextStory;
+$('prevStory').onclick = () => { if (storyAt > 0) { storyAt--; renderStory(); } };
+$('skipStory').onclick = () => page('login');
+$('replayStory').onclick = () => { storyAt = 0; renderStory(); page('story'); };
+renderStory();
 
 (async () => {
   if (!token) return;

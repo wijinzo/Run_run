@@ -21,8 +21,10 @@ class Login(BaseModel):
 class QuizSubmission(BaseModel):
     answers:list[int]=Field(min_length=4,max_length=4)
 class ScoreSubmission(BaseModel):
-    score:int=Field(ge=0,le=1000)
+    score:int=Field(ge=0,le=100000)
     attempt_id:str=Field(min_length=6,max_length=100)
+class ImageGeneratePayload(BaseModel):
+    user_note:str=Field(default='',max_length=240)
 class GuessStart(BaseModel):restart:bool=False
 class GuessChat(BaseModel):session_id:str;message:str=Field(min_length=1,max_length=200)
 class GuessAnswer(BaseModel):session_id:str;answer:str=Field(min_length=1,max_length=30)
@@ -105,8 +107,8 @@ async def quiz_submit(data:QuizSubmission,authorization:str|None=Header(None)):
 async def pinball_submit(data:ScoreSubmission,authorization:str|None=Header(None)):
     p=await player(authorization)
     # Casual demo: score is client-reported and not anti-cheat protected.
-    await save_record(p['id'],'pinball',data.score,data.score==1000,data.attempt_id)
-    return {'completed':data.score==1000,'score':data.score}
+    await save_record(p['id'],'pinball',data.score,data.score>=1000,data.attempt_id)
+    return {'completed':data.score>=1000,'score':data.score}
 
 WORDS={'雨傘':['傘'],'腳踏車':['自行車','單車'],'鉛筆':[],'月亮':['月球'],'書包':['背包']}
 async def guessing_session(pid,sid):
@@ -156,15 +158,17 @@ async def guess_answer(data:GuessAnswer,authorization:str|None=Header(None)):
 CLOTHES=['wearing a stylish formal business academy suit with elegant gold trim','wearing an observant social science scholar outfit with a notebook','wearing an expressive media and communications academy outfit with creative accessories','wearing soft literary academy clothing with scarf and classic books','wearing imaginative casual adventurer clothes','wearing a magical academy robe decorated with stars']
 SYMBOLS=['A large distant dragon silhouette in the sky','A clearly recognizable volleyball beside the character','A faint translucent misty spirit hovering quietly in the background','Mystical decorative floating letters and runic text-like symbols orbiting the character']
 
-def image_prompt(answers):
+def image_prompt(answers,user_note=''):
     academy, pudding, quote=answers[1],answers[2],answers[3]
     parts=['Use the provided character reference as the design base. Keep the original yellow body, pale belly, green eyes, and overall silhouette. Make the character noticeably cuter while preserving its core identity and recognizable features. Give it softer and rounder body proportions, slightly larger expressive eyes, a gentler and more lovable facial expression, and a warm playful charm. Present the character in a more adorable and endearing way. The character should be shown from the front, facing the viewer directly, with the head clearly oriented forward.', 'Create a single beautiful vertical fantasy forest adventure souvenir illustration with glowing starlight crystal, restored forest shrine, magical warm evening light. Full body character, appealing storybook composition, professional 3D cartoon render.','Clothing: '+CLOTHES[academy]+'.','Narrative magical element: '+SYMBOLS[quote]+'.']
     if pudding==1:parts.append('Add a tasteful amount of wealth symbolism: several gold coins, gems and a subtle ornate golden accessory.')
     parts.append('Do not turn this creature into a human, avoid adding other main characters. Keep details coherent and visually legible. Do not include user name or personal information.')
+    if user_note.strip():
+        parts.append('Player custom note (higher priority than default clothing, decorative elements and atmosphere; preserve the reference creature identity and single souvenir task):\n'+user_note.strip())
     return '\n'.join(parts)
 
 @app.post('/api/images/generate')
-async def generate_image(authorization:str|None=Header(None)):
+async def generate_image(data:ImageGeneratePayload=ImageGeneratePayload(),authorization:str|None=Header(None)):
     p=await player(authorization);pid=p['id'];items=await records(pid)
     if not {'quiz','guessing','pinball'}.issubset({r['game_type'] for r in items if r['completed']}):raise HTTPException(403,'需要先完成三關')
     existing=await db('GET','generated_images',f'?player_id=eq.{pid}&select=*')
@@ -185,7 +189,7 @@ async def generate_image(authorization:str|None=Header(None)):
     try:
         client=AsyncOpenAI(api_key=OPENAI_KEY,timeout=145)
         with ref.open('rb') as file:
-            result=await client.images.edit(model=IMAGE_MODEL,image=file,prompt=image_prompt(choices),size='1024x1536',quality='low',n=1)
+            result=await client.images.edit(model=IMAGE_MODEL,image=file,prompt=image_prompt(choices,data.user_note),size='1024x1536',quality='low',n=1)
         image_bytes=base64.b64decode(result.data[0].b64_json)
         object_path=f'{pid}/souvenir.png'
         async with httpx.AsyncClient(timeout=35) as http:

@@ -14,9 +14,16 @@
     <strong>✦ 星光森林 <small>STARLIGHT FOREST</small></strong>
     <span id="who"></span>
   </header>
-  <main>
-    <section id="login" class="page active">
-      <div class="hero"><span>✧</span><div class="hills"></div></div>
+  <main id="mainContent" tabindex="-1">
+    <section id="story" class="page active" aria-labelledby="storyTitle">
+      <div class="story-toolbar"><span class="overline">遺失的星之核心</span><button id="skipStory" class="link-btn">跳過故事 →</button></div>
+      <button id="storyArtButton" class="story-art-button" aria-label="繼續故事"><img id="storyArt" src="assets/story-01.webp" width="1448" height="1086" alt="星之核心照亮森林與溪流"></button>
+      <div class="story-copy"><p id="storyCount" class="overline">序章 · 01 / 04</p><h1 id="storyTitle">曾經的星光森林</h1><p id="storyText"></p></div>
+      <div class="story-actions"><button id="prevStory" class="secondary">← 上一幕</button><button id="nextStory" class="primary">繼續故事 →</button></div>
+      <p class="hint">點擊插圖或「繼續故事」，逐幕走進森林。</p>
+    </section>
+    <section id="login" class="page">
+      <div class="hero illustrated-hero"><img src="assets/story-04.webp" width="1448" height="1086" alt="精靈在森林入口等待冒險者"></div>
       <div class="card">
         <p class="overline">WELCOME, ADVENTURER</p>
         <h1>遺失的星之核心</h1>
@@ -28,14 +35,14 @@
           <input id="inviteCode" type="password" maxlength="100" placeholder="輸入活動邀請碼">
         </label>
         <button class="primary" id="loginBtn">踏入森林 ↗</button>
-        <p class="hint">同一裝置會記住登入狀態。請使用暱稱。</p>
+        <p class="hint">同一裝置會記住登入狀態。請使用暱稱。</p><button id="replayStory" class="link-btn">重看開場故事</button>
       </div>
     </section>
 
     <section id="map" class="page">
       <p class="overline">ADVENTURE MAP</p>
       <h1>星光森林冒險地圖</h1>
-      <p>點擊地圖上發光的地點，展開你的試煉。</p>
+      <p>三處微光，三塊失落的碎片。自由選擇地點，聽聽守護者的話，再展開試煉。</p>
       <div class="progress">
         <span id="progress">0 / 3 星光碎片</span>
         <div class="track"><i id="progressFill"></i></div>
@@ -49,9 +56,9 @@
                 stroke-dasharray="5 15" stroke-linecap="round" opacity=".8"/>
         </svg>
 
-        <div class="map-npc npc-pinball" aria-label="彈珠精靈">✦<small>彈珠精靈</small></div>
-        <div class="map-npc npc-owl" aria-label="貓頭鷹賢者">🦉<small>貓頭鷹賢者</small></div>
-        <div class="map-npc npc-tree" aria-label="古樹長老">🌳<small>古樹長老</small></div>
+        <div class="map-npc npc-pinball" aria-label="彈珠精靈"><img src="assets/npc-spirit.webp" width="1254" height="1254" alt=""><small>彈珠精靈</small></div>
+        <div class="map-npc npc-owl" aria-label="貓頭鷹賢者"><img src="assets/npc-owl.webp" width="1254" height="1254" alt=""><small>貓頭鷹賢者</small></div>
+        <div class="map-npc npc-tree" aria-label="古樹長老"><img src="assets/npc-tree.webp" width="1254" height="1254" alt=""><small>古樹長老</small></div>
 
         <button class="hotspot" style="left:28%;top:76%" data-go="pinball">
           <b>✷</b><span>01 星隕彈珠台</span><em id="donePinball"></em>
@@ -71,19 +78,20 @@
     <section id="pinball" class="page">
       <div class="nav"><button class="back">← 返回地圖</button><small>CHAPTER 01</small></div>
       <h2>星隕彈珠台</h2>
-      <p>向後拖曳星光彈珠，放開射擊小怪物。消滅所有怪物即可獲得 1000 分！彈珠會自動回到發射器，也可以手動召回。</p>
+      <p>向後拖曳、放開發射，享受角落反彈與連擊！每顆彈珠會在 5 秒後返回，也可以手動召回。完成三次彈射，凝聚星光碎片！</p>
       <div class="stats">
-        <span>分數 <strong id="score">0</strong></span>
-        <span>剩餘怪物 <strong id="enemyCount">3</strong></span>
+        <span>結算分數 <strong id="score">—</strong></span>
+        <span>剩餘彈珠 <strong id="ballsLeft">3</strong></span>
       </div>
       <div class="game-stage">
-        <canvas id="game" width="360" height="540"></canvas>
+        <canvas id="game" width="360" height="540" tabindex="0" aria-label="星光彈珠台：方向鍵調整角度，空白鍵發射"></canvas>
         <div class="game-modal" id="gameModal">
           <h3 id="gameTitle">準備好彈射了嗎？</h3>
           <p id="gameText">拉住下方的星光彈珠，放開發射！</p>
           <button class="primary" id="startGame">開始挑戰</button>
         </div>
       </div>
+      <div class="aim-controls"><label for="launchAngle">發射方向 <output id="angleLabel">正前方</output></label><input id="launchAngle" type="range" min="-70" max="70" value="0"><button id="launchOrb" class="secondary" disabled>發射彈珠</button></div>
       <button id="recallOrb" class="secondary" disabled>↩ 返回發射器</button>
       <button id="retryPinball" class="secondary" hidden>重試儲存</button>
       <p id="gameStatus" class="status"></p>
@@ -92,17 +100,17 @@
     <section id="guessing" class="page">
       <div class="nav"><button class="back">← 返回地圖</button><small>CHAPTER 02</small></div>
       <h2>謎語小屋</h2>
-      <p>向貓頭鷹賢者提問，猜出它心裡的秘密詞語。</p>
+      <p>向貓頭鷹賢者提問，猜出牠心裡的秘密詞語。</p><p class="hint notice">小心，貓頭鷹可能故意說你的答案不是答案。有答案時，就大膽提交試試吧！</p>
       <div class="chat">
-        <div class="chat-head">◉　貓頭鷹賢者 <span id="remaining">10 次提問</span></div>
+        <div class="chat-head"><img class="chat-avatar" src="assets/npc-owl.webp" width="1254" height="1254" alt=""> 貓頭鷹賢者 <span id="remaining">10 次提問</span></div>
         <div id="messages" class="messages" aria-live="polite"></div>
         <div class="composer">
-          <input id="chatInput" placeholder="向賢者提問…" maxlength="200">
+          <input id="chatInput" aria-label="向賢者提問" placeholder="向賢者提問…" maxlength="200">
           <button id="chatSend">傳送</button>
         </div>
       </div>
       <div class="composer guess">
-        <input id="guessInput" placeholder="我猜是…" maxlength="30">
+        <input id="guessInput" aria-label="你的謎題答案" placeholder="我猜是…" maxlength="30">
         <button id="guessSend">提交答案</button>
       </div>
       <button id="restartGuess" class="link-btn">重新開始猜字</button>
@@ -131,11 +139,12 @@
 
     <section id="final" class="page">
       <div class="nav"><button class="back">← 返回地圖</button><small>EPILOGUE</small></div>
-      <div class="final-art">✧ ✦ ✧</div>
+      <div class="final-art illustrated-hero"><img src="assets/story-01.webp" width="1448" height="1086" alt="修復後的星之核心照亮森林"></div>
       <h1>星之核心再次閃耀</h1>
       <p>你的選擇將改變冒險紀念卡上的服裝、配件與神秘象徵。</p>
+      <label for="userNote">在星座上留下自己的註解</label><textarea id="userNote" maxlength="240" rows="4" placeholder="簡單來說我會把你寫的prompt和 預設的prompt 一起給AI去生圖"></textarea>
       <button id="generate" class="primary">生成我的冒險紀念卡</button>
-      <p class="status" id="imageStatus">生圖會產生 API 費用，同一角色僅允許建立一次任務。</p>
+      <p class="status" id="imageStatus">森林將為你編織一張專屬紀念卡，每位冒險者可生成一次。</p>
       <img id="reward" hidden alt="AI 冒險紀念卡">
     </section>
   </main>
